@@ -10,6 +10,7 @@ export interface JenisAyam {
 export interface Kandang {
   id: string;
   nomor_kandang: string;
+  tipe_kandang?: string;
   jenis_ayam_jantan: string | null;
   jenis_ayam_betina: string | null;
   jumlah_jantan: number;
@@ -45,6 +46,18 @@ export interface TransaksiKeuangan {
   kategori: string;
   keterangan: string | null;
   nominal: number;
+  nomor_kandang?: string | null;
+  kuantitas?: number | null;
+  created_at: string;
+}
+
+export interface AnakAyam {
+  id: string;
+  tanggal_tetas: string;
+  jenis_ayam: string | null;
+  kandang_pembesaran: string | null;
+  jumlah_ekor: number;
+  keterangan: string | null;
   created_at: string;
 }
 
@@ -91,6 +104,7 @@ const DEFAULT_LAPORAN: LaporanTelur[] = [
 
 const DEFAULT_PENETASAN: Penetasan[] = [];
 const DEFAULT_TRANSAKSI: TransaksiKeuangan[] = [];
+const DEFAULT_ANAK_AYAM: AnakAyam[] = [];
 
 // Helper functions for Local Storage storage
 const getLocalStorageData = <T>(key: string, defaultData: T[]): T[] => {
@@ -286,6 +300,7 @@ export const dbService = {
         .from('kandang')
         .insert([{
           nomor_kandang: numKandang,
+          tipe_kandang: payload.tipe_kandang || 'Induk',
           jenis_ayam_jantan: payload.jenis_ayam_jantan || null,
           jenis_ayam_betina: payload.jenis_ayam_betina || null,
           jumlah_jantan: payload.jumlah_jantan,
@@ -308,6 +323,7 @@ export const dbService = {
       const newItem: Kandang = {
         id: `KNDG-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
         nomor_kandang: numKandang,
+        tipe_kandang: payload.tipe_kandang || 'Induk',
         jenis_ayam_jantan: payload.jenis_ayam_jantan || null,
         jenis_ayam_betina: payload.jenis_ayam_betina || null,
         jumlah_jantan: payload.jumlah_jantan,
@@ -329,6 +345,7 @@ export const dbService = {
         .from('kandang')
         .update({
           nomor_kandang: numKandang,
+          tipe_kandang: payload.tipe_kandang || 'Induk',
           jenis_ayam_jantan: payload.jenis_ayam_jantan || null,
           jenis_ayam_betina: payload.jenis_ayam_betina || null,
           jumlah_jantan: payload.jumlah_jantan,
@@ -356,6 +373,7 @@ export const dbService = {
       const updatedItem: Kandang = {
         ...list[idx],
         nomor_kandang: numKandang,
+        tipe_kandang: payload.tipe_kandang || 'Induk',
         jenis_ayam_jantan: payload.jenis_ayam_jantan || null,
         jenis_ayam_betina: payload.jenis_ayam_betina || null,
         jumlah_jantan: payload.jumlah_jantan,
@@ -555,6 +573,56 @@ export const dbService = {
   },
 
   async addTransaksi(payload: Omit<TransaksiKeuangan, 'id' | 'created_at'>): Promise<TransaksiKeuangan> {
+    // 1. Logika pemotongan stok otomatis jika diperlukan
+    if (payload.jenis_transaksi === 'Pemasukan' && payload.nomor_kandang && payload.kuantitas && payload.kuantitas > 0) {
+      if (payload.kategori === 'Penjualan Kiloan' || payload.kategori === 'Penjualan Paketan') {
+        const kList = await this.getKandang();
+        const kandang = kList.find(k => k.nomor_kandang === payload.nomor_kandang);
+        if (kandang) {
+          let jb = kandang.jumlah_betina;
+          let jj = kandang.jumlah_jantan;
+          let qty = payload.kuantitas;
+          
+          // Kurangi dari betina dulu, lalu sisanya dari jantan (afkir layer biasanya betina)
+          if (jb >= qty) {
+            jb -= qty;
+          } else {
+            qty -= jb;
+            jb = 0;
+            jj = Math.max(0, jj - qty);
+          }
+          
+          await this.updateKandang(kandang.id, {
+            nomor_kandang: kandang.nomor_kandang,
+            jenis_ayam_jantan: kandang.jenis_ayam_jantan,
+            jenis_ayam_betina: kandang.jenis_ayam_betina,
+            jumlah_jantan: jj,
+            jumlah_betina: jb
+          });
+        }
+      } else if (payload.kategori === 'Penjualan DOC') {
+        const aList = await this.getAnakAyam();
+        // Cari DOC berdasarkan kandang, urutkan dari yang tertua
+        const matched = aList.filter(a => a.kandang_pembesaran === payload.nomor_kandang && a.jumlah_ekor > 0)
+                             .sort((a, b) => new Date(a.tanggal_tetas).getTime() - new Date(b.tanggal_tetas).getTime());
+        
+        let qty = payload.kuantitas;
+        for (const doc of matched) {
+          if (qty <= 0) break;
+          const deduct = Math.min(doc.jumlah_ekor, qty);
+          doc.jumlah_ekor -= deduct;
+          qty -= deduct;
+          await this.updateAnakAyam(doc.id, {
+            tanggal_tetas: doc.tanggal_tetas,
+            jenis_ayam: doc.jenis_ayam,
+            kandang_pembesaran: doc.kandang_pembesaran,
+            jumlah_ekor: doc.jumlah_ekor,
+            keterangan: doc.keterangan
+          });
+        }
+      }
+    }
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase
         .from('transaksi_keuangan')
@@ -610,6 +678,81 @@ export const dbService = {
       if (idx === -1) throw new Error('Data transaksi tidak ditemukan.');
       list.splice(idx, 1);
       setLocalStorageData('ff_transaksi', list);
+    }
+  },
+
+  // ==========================================
+  // ANAK AYAM
+  // ==========================================
+  async getAnakAyam(): Promise<AnakAyam[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('anak_ayam')
+        .select('*')
+        .order('tanggal_tetas', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } else {
+      return getLocalStorageData<AnakAyam>('ff_anak_ayam', DEFAULT_ANAK_AYAM);
+    }
+  },
+
+  async addAnakAyam(payload: Omit<AnakAyam, 'id' | 'created_at'>): Promise<AnakAyam> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('anak_ayam')
+        .insert([payload])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } else {
+      const list = getLocalStorageData<AnakAyam>('ff_anak_ayam', DEFAULT_ANAK_AYAM);
+      const newItem: AnakAyam = {
+        ...payload,
+        id: `AA-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        created_at: new Date().toISOString()
+      };
+      list.unshift(newItem);
+      setLocalStorageData('ff_anak_ayam', list);
+      return newItem;
+    }
+  },
+
+  async updateAnakAyam(id: string, payload: Omit<AnakAyam, 'id' | 'created_at'>): Promise<AnakAyam> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('anak_ayam')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } else {
+      const list = getLocalStorageData<AnakAyam>('ff_anak_ayam', DEFAULT_ANAK_AYAM);
+      const idx = list.findIndex(a => a.id === id);
+      if (idx === -1) throw new Error('Data anak ayam tidak ditemukan.');
+      const updatedItem: AnakAyam = { ...list[idx], ...payload };
+      list[idx] = updatedItem;
+      setLocalStorageData('ff_anak_ayam', list);
+      return updatedItem;
+    }
+  },
+
+  async deleteAnakAyam(id: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from('anak_ayam')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    } else {
+      const list = getLocalStorageData<AnakAyam>('ff_anak_ayam', DEFAULT_ANAK_AYAM);
+      const idx = list.findIndex(a => a.id === id);
+      if (idx === -1) throw new Error('Data anak ayam tidak ditemukan.');
+      list.splice(idx, 1);
+      setLocalStorageData('ff_anak_ayam', list);
     }
   },
 

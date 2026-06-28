@@ -16,6 +16,7 @@ INSERT INTO jenis_ayam (nama_jenis_ayam, keterangan) VALUES
 CREATE TABLE kandang (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     nomor_kandang VARCHAR(50) UNIQUE NOT NULL,
+    tipe_kandang VARCHAR(50) DEFAULT 'Induk' CHECK (tipe_kandang IN ('Induk', 'DOC', 'Pembesaran', 'Pullet')),
     jenis_ayam_jantan VARCHAR(100) REFERENCES jenis_ayam(nama_jenis_ayam) ON UPDATE CASCADE ON DELETE SET NULL,
     jenis_ayam_betina VARCHAR(100) REFERENCES jenis_ayam(nama_jenis_ayam) ON UPDATE CASCADE ON DELETE SET NULL,
     jumlah_jantan INT DEFAULT 0 CHECK (jumlah_jantan >= 0),
@@ -58,6 +59,19 @@ CREATE TABLE transaksi_keuangan (
     kategori VARCHAR(50) NOT NULL,
     keterangan TEXT,
     nominal BIGINT NOT NULL CHECK (nominal >= 0),
+    nomor_kandang VARCHAR(50) REFERENCES kandang(nomor_kandang) ON UPDATE CASCADE ON DELETE SET NULL,
+    kuantitas INT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 7. Tabel Anak Ayam
+CREATE TABLE anak_ayam (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    tanggal_tetas DATE NOT NULL DEFAULT CURRENT_DATE,
+    jenis_ayam VARCHAR(100) REFERENCES jenis_ayam(nama_jenis_ayam) ON UPDATE CASCADE ON DELETE SET NULL,
+    kandang_pembesaran VARCHAR(50) REFERENCES kandang(nomor_kandang) ON UPDATE CASCADE ON DELETE SET NULL,
+    jumlah_ekor INT NOT NULL CHECK (jumlah_ekor >= 0),
+    keterangan TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -68,3 +82,4 @@ ALTER TABLE kandang DISABLE ROW LEVEL SECURITY;
 ALTER TABLE laporan_telur DISABLE ROW LEVEL SECURITY;
 ALTER TABLE penetasan DISABLE ROW LEVEL SECURITY;
 ALTER TABLE transaksi_keuangan DISABLE ROW LEVEL SECURITY;
+ALTER TABLE anak_ayam DISABLE ROW LEVEL SECURITY;

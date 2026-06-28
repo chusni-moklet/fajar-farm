@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Egg, Moon, Sun, LineChart, Warehouse, Tags, ClipboardList, LogOut, ShieldAlert, Wallet } from 'lucide-react';
+import { Egg, Moon, Sun, LineChart, Warehouse, Tags, ClipboardList, LogOut, ShieldAlert, Wallet, Bird } from 'lucide-react';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -74,6 +74,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { href: '/', label: 'Dashboard', icon: LineChart },
     { href: '/admin/kandang', label: 'Master Kandang', icon: Warehouse },
     { href: '/admin/jenis-ayam', label: 'Jenis Ayam', icon: Tags },
+    { href: '/admin/anak-ayam', label: 'Anak Ayam', icon: Bird },
     { href: '/laporan', label: 'Input Telur', icon: ClipboardList },
     { href: '/admin/penetasan', label: 'Penetasan', icon: Egg },
     { href: '/admin/keuangan', label: 'Keuangan', icon: Wallet }

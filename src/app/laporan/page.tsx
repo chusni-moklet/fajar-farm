@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { dbService, LaporanTelur, Kandang } from '@/lib/dbService';
 import { useToast } from '@/context/ToastContext';
-import { ClipboardList, Trash2, Calendar, PlusCircle, Search, Info } from 'lucide-react';
+import { ClipboardList, Trash2, Calendar, PlusCircle, Search, Info, TrendingUp } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function LaporanPage() {
   const { showToast } = useToast();
@@ -29,7 +30,7 @@ export default function LaporanPage() {
     setLoading(true);
     try {
       const pens = await dbService.getKandang();
-      setKandangList(pens);
+      setKandangList(pens.filter(k => k.tipe_kandang === 'Induk' || !k.tipe_kandang));
       const reports = await dbService.getLaporan();
       setLaporanList(reports);
     } catch (err: any) {
@@ -120,6 +121,23 @@ export default function LaporanPage() {
     return filterKandang === '' || rep.nomor_kandang === filterKandang;
   });
 
+  const totalTelur = useMemo(() => {
+    return filteredReports.reduce((sum, rep) => sum + rep.jumlah_telur, 0);
+  }, [filteredReports]);
+
+  const chartData = useMemo(() => {
+    const sorted = [...filteredReports].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+    const grouped = sorted.reduce((acc: any, curr) => {
+      const date = formatIndoDate(curr.tanggal);
+      if (!acc[date]) {
+        acc[date] = { date, total: 0 };
+      }
+      acc[date].total += curr.jumlah_telur;
+      return acc;
+    }, {});
+    return Object.values(grouped);
+  }, [filteredReports]);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,7 +176,7 @@ export default function LaporanPage() {
               >
                 <option value="" disabled>Pilih Kandang</option>
                 {kandangList.map(k => (
-                  <option key={k.id} value={k.nomor_kandang} className="dark:bg-[#0b1329]">Kandang {k.nomor_kandang}</option>
+                  <option key={k.id} value={k.nomor_kandang} className="dark:bg-[#0b1329]">{k.tipe_kandang || 'Induk'} {k.nomor_kandang}</option>
                 ))}
               </select>
               {kandangList.length === 0 && (
@@ -240,11 +258,51 @@ export default function LaporanPage() {
               >
                 <option value="">Semua Kandang</option>
                 {kandangList.map(k => (
-                  <option key={k.id} value={k.nomor_kandang} className="dark:bg-[#0b1329]">Kandang {k.nomor_kandang}</option>
+                  <option key={k.id} value={k.nomor_kandang} className="dark:bg-[#0b1329]">{k.tipe_kandang || 'Induk'} {k.nomor_kandang}</option>
                 ))}
               </select>
             </div>
           </div>
+
+          {!loading && filteredReports.length > 0 && (
+            <div className="mb-6 space-y-4">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                <div>
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">Total Produksi Telur</p>
+                  <p className="text-3xl font-black text-emerald-700 dark:text-emerald-300 mt-1">
+                    {totalTelur} <span className="text-sm font-semibold text-emerald-600/70 dark:text-emerald-400/70">butir</span>
+                  </p>
+                </div>
+                <div className="h-12 w-12 bg-emerald-100 dark:bg-emerald-800/50 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              </div>
+
+              <div className="h-64 w-full bg-white/50 dark:bg-[#0b1329]/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-4">Grafik Produksi</p>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                      <XAxis dataKey="date" tick={{fontSize: 10, fill: '#64748b'}} tickLine={false} axisLine={false} minTickGap={20} />
+                      <YAxis tick={{fontSize: 10, fill: '#64748b'}} tickLine={false} axisLine={false} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--background)' }}
+                        itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
+                      />
+                      <Area type="monotone" dataKey="total" name="Jumlah Telur" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="space-y-3 flex-grow">
@@ -280,7 +338,7 @@ export default function LaporanPage() {
                           {formatIndoDate(item.tanggal)}
                         </td>
                         <td className="py-4 font-bold text-slate-700 dark:text-slate-200">
-                          Kandang {item.nomor_kandang}
+                          {kandangList.find(k => k.nomor_kandang === item.nomor_kandang)?.tipe_kandang || 'Induk'} {item.nomor_kandang}
                         </td>
                         <td className="py-4 text-center">
                           <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full ${

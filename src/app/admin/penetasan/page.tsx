@@ -34,7 +34,7 @@ export default function PenetasanPage() {
       const p = await dbService.getPenetasan();
       setPenetasanList(p);
       const k = await dbService.getKandang();
-      setKandangList(k);
+      setKandangList(k.filter(pen => pen.tipe_kandang === 'Induk' || !pen.tipe_kandang));
     } catch (err: any) {
       showToast(err.message || 'Gagal memuat data.', 'error');
     } finally {
@@ -178,7 +178,7 @@ export default function PenetasanPage() {
                 <option value="">-- Pilih Asal Kandang --</option>
                 {kandangList.map(k => (
                   <option key={k.id} value={k.nomor_kandang} className="dark:bg-[#0b1329]">
-                    Kandang {k.nomor_kandang}
+                    {k.tipe_kandang || 'Induk'} {k.nomor_kandang}
                   </option>
                 ))}
               </select>

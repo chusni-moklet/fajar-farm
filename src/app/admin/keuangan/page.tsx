@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { dbService, TransaksiKeuangan } from '@/lib/dbService';
+import { dbService, TransaksiKeuangan, Kandang } from '@/lib/dbService';
 import { useToast } from '@/context/ToastContext';
 import { Trash2, Edit3, Search, PlusCircle, XCircle, Wallet, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 
@@ -29,6 +29,7 @@ export default function KeuanganPage() {
 
   // State
   const [transaksiList, setTransaksiList] = useState<TransaksiKeuangan[]>([]);
+  const [kandangList, setKandangList] = useState<Kandang[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterJenis, setFilterJenis] = useState<'Semua' | 'Pemasukan' | 'Pengeluaran'>('Semua');
@@ -40,6 +41,8 @@ export default function KeuanganPage() {
   const [kategori, setKategori] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [nominal, setNominal] = useState(0);
+  const [nomorKandang, setNomorKandang] = useState('');
+  const [kuantitas, setKuantitas] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   // Modal State
@@ -51,6 +54,8 @@ export default function KeuanganPage() {
     try {
       const trx = await dbService.getTransaksi();
       setTransaksiList(trx);
+      const kandang = await dbService.getKandang();
+      setKandangList(kandang);
     } catch (err: any) {
       showToast(err.message || 'Gagal memuat data.', 'error');
     } finally {
@@ -69,6 +74,8 @@ export default function KeuanganPage() {
     setKategori('');
     setKeterangan('');
     setNominal(0);
+    setNomorKandang('');
+    setKuantitas(0);
   };
 
   const handleEdit = (t: TransaksiKeuangan) => {
@@ -78,6 +85,8 @@ export default function KeuanganPage() {
     setKategori(t.kategori);
     setKeterangan(t.keterangan || '');
     setNominal(t.nominal);
+    setNomorKandang(t.nomor_kandang || '');
+    setKuantitas(t.kuantitas || 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -98,7 +107,9 @@ export default function KeuanganPage() {
       jenis_transaksi: jenisTransaksi,
       kategori,
       keterangan: keterangan || null,
-      nominal
+      nominal,
+      nomor_kandang: nomorKandang || null,
+      kuantitas: kuantitas > 0 ? kuantitas : null
     };
 
     try {
@@ -265,6 +276,41 @@ export default function KeuanganPage() {
               </select>
             </div>
 
+            {jenisTransaksi === 'Pemasukan' && ['Penjualan DOC', 'Penjualan Kiloan', 'Penjualan Paketan', 'Penjualan Telur'].includes(kategori) && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">
+                    Kandang (Sumber)
+                  </label>
+                  <select
+                    value={nomorKandang}
+                    onChange={(e) => setNomorKandang(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[#0b1329]/50 text-xs focus:border-emerald-500 focus:outline-none dark:text-white"
+                  >
+                    <option value="">-- Pilih Kandang --</option>
+                    {kandangList.map(k => (
+                      <option key={k.id} value={k.nomor_kandang} className="dark:bg-[#0b1329]">
+                        {k.tipe_kandang || 'Induk'} {k.nomor_kandang}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">
+                    Kuantitas (Ekor/Butir)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={kuantitas || ''}
+                    onChange={(e) => setKuantitas(Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="Opsional"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-[#0b1329]/50 text-xs font-bold focus:border-emerald-500 focus:outline-none dark:text-white"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">
                 Nominal (Rp)
@@ -369,6 +415,11 @@ export default function KeuanganPage() {
                         <td className="py-4">
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-700 dark:text-slate-200">{t.kategori}</span>
+                            {t.nomor_kandang && (
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                {kandangList.find(k => k.nomor_kandang === t.nomor_kandang)?.tipe_kandang || 'Induk'} {t.nomor_kandang} {t.kuantitas ? `• ${t.kuantitas} qty` : ''}
+                              </span>
+                            )}
                             {t.keterangan && (
                               <span className="text-[10px] text-slate-400 mt-0.5">{t.keterangan}</span>
                             )}
