@@ -138,6 +138,11 @@ export default function LaporanPage() {
     return Object.values(grouped);
   }, [filteredReports]);
 
+  const selectedKandangData = useMemo(() => {
+    if (!filterKandang) return null;
+    return kandangList.find(k => k.nomor_kandang === filterKandang) || null;
+  }, [filterKandang, kandangList]);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -266,16 +271,49 @@ export default function LaporanPage() {
 
           {!loading && filteredReports.length > 0 && (
             <div className="mb-6 space-y-4">
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl p-5 flex items-center justify-between shadow-sm">
-                <div>
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">Total Produksi Telur</p>
-                  <p className="text-3xl font-black text-emerald-700 dark:text-emerald-300 mt-1">
-                    {totalTelur} <span className="text-sm font-semibold text-emerald-600/70 dark:text-emerald-400/70">butir</span>
-                  </p>
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">Total Produksi Telur</p>
+                    <p className="text-3xl font-black text-emerald-700 dark:text-emerald-300 mt-1">
+                      {totalTelur} <span className="text-sm font-semibold text-emerald-600/70 dark:text-emerald-400/70">butir</span>
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 bg-emerald-100 dark:bg-emerald-800/50 rounded-full flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
                 </div>
-                <div className="h-12 w-12 bg-emerald-100 dark:bg-emerald-800/50 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                </div>
+
+                {selectedKandangData && (
+                  <div className="mt-5 pt-4 border-t border-emerald-200 dark:border-emerald-800/50 flex flex-wrap gap-x-8 gap-y-4 text-xs font-semibold">
+                    <div className="flex flex-col space-y-1.5">
+                      <span className="text-emerald-700/60 dark:text-emerald-400/60 text-[10px] uppercase font-bold tracking-wider">Jenis Ayam</span>
+                      <div className="flex items-center space-x-3 bg-white/50 dark:bg-[#0b1329]/50 px-3 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                        <span className="text-blue-600 dark:text-blue-400 flex items-center">
+                          <span className="w-3 text-center mr-1">♂</span> {selectedKandangData.jenis_ayam_jantan || '-'}
+                        </span>
+                        <span className="w-px h-3 bg-emerald-200 dark:bg-emerald-800/50"></span>
+                        <span className="text-pink-600 dark:text-pink-400 flex items-center">
+                          <span className="w-3 text-center mr-1">♀</span> {selectedKandangData.jenis_ayam_betina || '-'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-1.5">
+                      <span className="text-emerald-700/60 dark:text-emerald-400/60 text-[10px] uppercase font-bold tracking-wider">Populasi</span>
+                      <div className="flex items-center space-x-3 bg-white/50 dark:bg-[#0b1329]/50 px-3 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                        <span className="text-blue-600 dark:text-blue-400 flex items-center">
+                          <span className="w-3 text-center mr-1">♂</span> {selectedKandangData.jumlah_jantan}
+                        </span>
+                        <span className="w-px h-3 bg-emerald-200 dark:bg-emerald-800/50"></span>
+                        <span className="text-pink-600 dark:text-pink-400 flex items-center">
+                          <span className="w-3 text-center mr-1">♀</span> {selectedKandangData.jumlah_betina}
+                        </span>
+                        <span className="w-px h-3 bg-emerald-200 dark:bg-emerald-800/50"></span>
+                        <span className="text-emerald-700 dark:text-emerald-300 font-bold">Total: {selectedKandangData.total_populasi}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="h-64 w-full bg-white/50 dark:bg-[#0b1329]/50 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
